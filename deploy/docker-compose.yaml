@@ -1,0 +1,46 @@
+name: tripgo
+
+x-trip-service: &trip-service
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  image: trip-service:local
+  env_file: ../.env.example
+  environment:
+    DATABASE_URL: postgres://tripgo:tripgo@postgres:5432/tripgo?sslmode=disable
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: tripgo
+      POSTGRES_PASSWORD: tripgo
+      POSTGRES_DB: tripgo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tripgo -d tripgo"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    <<: *trip-service
+    command: ["migrate", "up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  trip-service:
+    <<: *trip-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    stop_grace_period: 15s
+
+volumes:
+  postgres-data:
