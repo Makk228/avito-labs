@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -17,6 +19,7 @@ type Config struct {
 	HTTP        HTTP
 	DB          DB
 	Idempotency Idempotency
+	Telemetry   Telemetry
 }
 
 type HTTP struct {
@@ -39,6 +42,12 @@ type DB struct {
 type Idempotency struct {
 	KeyTTL          time.Duration
 	CleanupInterval time.Duration
+}
+
+type Telemetry struct {
+	Version  string
+	Endpoint string
+	Protocol string
 }
 
 func Load() (Config, error) {
@@ -68,6 +77,26 @@ func Load() (Config, error) {
 		},
 	}
 
+	cfg.Telemetry = Telemetry{Version: r.str("SERVICE_VERSION"), Endpoint: r.str("OTEL_EXPORTER_OTLP_ENDPOINT"), Protocol: r.str("OTEL_EXPORTER_OTLP_PROTOCOL")}
+	endpoint, err := url.Parse(cfg.Telemetry.Endpoint)
+	if err != nil || endpoint.Host == "" || (endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+		r.fail("OTEL_EXPORTER_OTLP_ENDPOINT must be an absolute http(s) URL")
+	}
+	if cfg.Telemetry.Protocol != "grpc" && cfg.Telemetry.Protocol != "http/protobuf" {
+		r.fail("OTEL_EXPORTER_OTLP_PROTOCOL must be grpc or http/protobuf")
+	}
+	sampler := r.str("OTEL_TRACES_SAMPLER")
+	switch sampler {
+	case "always_on", "always_off", "traceidratio", "parentbased_always_on", "parentbased_always_off", "parentbased_traceidratio":
+	default:
+		r.fail("OTEL_TRACES_SAMPLER is invalid")
+	}
+	if sampler == "traceidratio" || sampler == "parentbased_traceidratio" {
+		ratio, err := strconv.ParseFloat(r.str("OTEL_TRACES_SAMPLER_ARG"), 64)
+		if err != nil || math.IsNaN(ratio) || ratio < 0 || ratio > 1 {
+			r.fail("OTEL_TRACES_SAMPLER_ARG must be between 0 and 1")
+		}
+	}
 	if cfg.DB.MinConns > cfg.DB.MaxConns {
 		r.fail("DATABASE_MIN_CONNS (%d) must not exceed DATABASE_MAX_CONNS (%d)", cfg.DB.MinConns, cfg.DB.MaxConns)
 	}

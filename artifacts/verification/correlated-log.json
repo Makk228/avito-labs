@@ -1,0 +1,12 @@
+{
+  "time": "2026-11-06T15:06:01.4612487+03:00",
+  "level": "INFO",
+  "msg": "request handled",
+  "service": "trip-service",
+  "method": "POST",
+  "route": "/api/v1/trips",
+  "status": 201,
+  "duration_ms": 8,
+  "trace_id": "a136a10a34399d5fa36c3ac19c86445b",
+  "span_id": "130902f39c4bd0d0"
+}

@@ -1,0 +1,11 @@
+{
+  "body": {
+    "code": "internal_error",
+    "detail": "Internal server error",
+    "instance": "/api/v1/trips/2731b267-2711-4e79-b877-2c791d6ddb44",
+    "status": 500,
+    "title": "Internal Server Error",
+    "type": "https://tripgo.example/problems/internal-error"
+  },
+  "status": 500
+}

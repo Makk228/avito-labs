@@ -1,0 +1,11 @@
+{
+  "database_spans": 6,
+  "route_templates": true,
+  "request_log_count": 12,
+  "trace_id": "82685633e90b274bdc94835831bf892d",
+  "otlp_metrics_received": true,
+  "level_mapping": true,
+  "request_count": 12,
+  "readiness_error_logged": true,
+  "required_log_fields": true
+}

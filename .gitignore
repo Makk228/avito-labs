@@ -6,3 +6,8 @@
 bin/
 
 .DS_Store
+
+.tools/
+coverage.out
+coverage-business.out
+artifacts/verification/*.log

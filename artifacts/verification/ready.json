@@ -1,0 +1,6 @@
+{
+  "health": 200,
+  "rechecked_build_running": true,
+  "addr": "127.0.0.1:18080",
+  "ready": 200
+}

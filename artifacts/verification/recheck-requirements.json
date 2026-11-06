@@ -1,0 +1,6 @@
+{
+  "enabled": 18,
+  "required_linters": 18,
+  "environment_matches": true,
+  "missing": []
+}
