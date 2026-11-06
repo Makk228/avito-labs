@@ -1,0 +1,11 @@
+{
+  "incoming_parent_span": "c1261f3b6a544ee1",
+  "parent_preserved": true,
+  "export_protocol": "grpc",
+  "exported_spans": 4,
+  "http_status": 200,
+  "worker_stopped": true,
+  "service_stopped": true,
+  "exit_code": 0,
+  "trace_id": "a5a5f6aeab624299932f280c4e5650f9"
+}

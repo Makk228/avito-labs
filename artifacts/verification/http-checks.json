@@ -1,0 +1,30 @@
+[
+  {
+    "status": 201,
+    "scenario": "create"
+  },
+  {
+    "status": 409,
+    "scenario": "driver_busy"
+  },
+  {
+    "status": 200,
+    "scenario": "get"
+  },
+  {
+    "status": 200,
+    "scenario": "finish"
+  },
+  {
+    "status": 409,
+    "scenario": "completed"
+  },
+  {
+    "status": 404,
+    "scenario": "missing"
+  },
+  {
+    "status": 400,
+    "scenario": "invalid"
+  }
+]

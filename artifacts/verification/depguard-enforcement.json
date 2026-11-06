@@ -1,0 +1,6 @@
+{
+  "domain_http_rejected": true,
+  "http_infrastructure_rejected": true,
+  "usecase_repository_rejected": true,
+  "depguard_violations": 3
+}

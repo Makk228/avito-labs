@@ -3,14 +3,22 @@ include .env.example
 export
 
 BIN          := bin/trip-service
+TEST_COUNT   ?= 1
 IMAGE        := trip-service:local
 OAPI_CONFIG  := internal/generated/oapi-codegen.yaml
 OPENAPI_SPEC := contracts/openapi/trip-service.openapi.yaml
 COMPOSE      := docker compose -f deploy/docker-compose.yaml
 
 DOCKER_DATABASE_URL = $(subst @127.0.0.1:,@host.docker.internal:,$(subst @localhost:,@host.docker.internal:,$(DATABASE_URL)))
+DOCKER_OTLP_ENDPOINT = $(subst //127.0.0.1:,//host.docker.internal:,$(subst //localhost:,//host.docker.internal:,$(OTEL_EXPORTER_OTLP_ENDPOINT)))
 DOCKER_RUN = docker run --rm --add-host=host.docker.internal:host-gateway \
-	--env-file .env.example -e DATABASE_URL="$(DOCKER_DATABASE_URL)"
+	--env-file .env.example -e DATABASE_URL="$(DOCKER_DATABASE_URL)" \
+	-e OTEL_EXPORTER_OTLP_ENDPOINT="$(DOCKER_OTLP_ENDPOINT)" \
+	-e OTEL_EXPORTER_OTLP_PROTOCOL="$(OTEL_EXPORTER_OTLP_PROTOCOL)" \
+	-e OTEL_TRACES_SAMPLER="$(OTEL_TRACES_SAMPLER)" \
+	-e OTEL_TRACES_SAMPLER_ARG="$(OTEL_TRACES_SAMPLER_ARG)" \
+	-e OTEL_RESOURCE_ATTRIBUTES="$(OTEL_RESOURCE_ATTRIBUTES)" \
+	-e LOG_LEVEL="$(LOG_LEVEL)" -e SERVICE_VERSION="$(SERVICE_VERSION)"
 
 .DEFAULT_GOAL := build
 
@@ -19,6 +27,7 @@ DOCKER_RUN = docker run --rm --add-host=host.docker.internal:host-gateway \
 
 generate:
 	go tool oapi-codegen -config $(OAPI_CONFIG) $(OPENAPI_SPEC)
+	go generate ./internal/...
 
 build:
 	go build -o $(BIN) ./cmd/trip-service
@@ -39,7 +48,19 @@ migrate-status: build
 	./$(BIN) migrate status
 
 test:
-	go test -race -count=1 ./...
+	go test -race -count=$(TEST_COUNT) -coverprofile=coverage.out ./...
+	go test -race -count=$(TEST_COUNT) -coverprofile=coverage-business.out ./internal/domain/... ./internal/usecase/...
+	go tool cover -func=coverage-business.out
+
+.PHONY: lint fmt test-integration
+lint:
+	golangci-lint run
+
+fmt:
+	golangci-lint fmt
+
+test-integration:
+	go test -race -tags=integration -count=2 ./...
 
 docker-build:
 	docker build -f deploy/Dockerfile -t $(IMAGE) .

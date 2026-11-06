@@ -1,0 +1,25 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "vector",
+    "result": [
+      {
+        "metric": {
+          "__name__": "tripgo_trips_created_total",
+          "deployment_environment": "local",
+          "exported_job": "tripgo/trip-service",
+          "instance": "otel-collector:8889",
+          "job": "otel-collector",
+          "otel_scope_name": "trip-service",
+          "service_name": "trip-service",
+          "service_namespace": "tripgo",
+          "service_version": "local"
+        },
+        "value": [
+          1793991991.423,
+          "40"
+        ]
+      }
+    ]
+  }
+}

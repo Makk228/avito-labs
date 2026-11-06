@@ -1,0 +1,50 @@
+[
+  {
+    "status": 201,
+    "scenario": "create"
+  },
+  {
+    "status": 409,
+    "scenario": "busy"
+  },
+  {
+    "status": 200,
+    "scenario": "get"
+  },
+  {
+    "status": 200,
+    "scenario": "finish"
+  },
+  {
+    "status": 409,
+    "scenario": "completed"
+  },
+  {
+    "status": 404,
+    "scenario": "missing"
+  },
+  {
+    "status": 400,
+    "scenario": "invalid"
+  },
+  {
+    "status": 400,
+    "scenario": "bad UUID"
+  },
+  {
+    "status": 405,
+    "scenario": "method"
+  },
+  {
+    "status": 503,
+    "scenario": "ready database error"
+  },
+  {
+    "status": 500,
+    "scenario": "repository error"
+  },
+  {
+    "status": 200,
+    "scenario": "collector unavailable"
+  }
+]

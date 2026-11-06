@@ -6,8 +6,11 @@ x-trip-service: &trip-service
     dockerfile: deploy/Dockerfile
   image: trip-service:local
   env_file: ../.env.example
+  extra_hosts:
+    - host.docker.internal:host-gateway
   environment:
     DATABASE_URL: postgres://tripgo:tripgo@postgres:5432/tripgo?sslmode=disable
+    OTEL_EXPORTER_OTLP_ENDPOINT: ${COMPOSE_OTLP_ENDPOINT:-http://host.docker.internal:4318}
 
 services:
   postgres:

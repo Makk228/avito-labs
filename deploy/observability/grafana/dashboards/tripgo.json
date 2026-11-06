@@ -1,0 +1,145 @@
+{
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "HTTP request duration — p95 (seconds)",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket[1m])))",
+          "legendFormat": "{{http_route}} {{http_response_status_code}} {{db_collection_name}}"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "h": 8,
+        "w": 12,
+        "y": 0.0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 1
+    },
+    {
+      "type": "stat",
+      "title": "Trips created",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(tripgo_trips_created_total)",
+          "legendFormat": "{{http_route}} {{http_response_status_code}} {{db_collection_name}}"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "h": 8,
+        "w": 12,
+        "y": 0.0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 2
+    },
+    {
+      "type": "stat",
+      "title": "Trips completed",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(tripgo_trips_completed_total)",
+          "legendFormat": "{{http_route}} {{http_response_status_code}} {{db_collection_name}}"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "h": 8,
+        "w": 12,
+        "y": 8.0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 3
+    },
+    {
+      "type": "stat",
+      "title": "Active trips",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(tripgo_trips_active)",
+          "legendFormat": "{{http_route}} {{http_response_status_code}} {{db_collection_name}}"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "h": 8,
+        "w": 12,
+        "y": 8.0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 4
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP requests by route and status",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (http_route, http_response_status_code) (http_server_request_duration_seconds_count)",
+          "legendFormat": "{{http_route}} {{http_response_status_code}} {{db_collection_name}}"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "h": 8,
+        "w": 12,
+        "y": 16.0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 5
+    },
+    {
+      "type": "timeseries",
+      "title": "Database duration — p95 (seconds)",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, db_collection_name) (rate(db_client_operation_duration_seconds_bucket[1m])))",
+          "legendFormat": "{{http_route}} {{http_response_status_code}} {{db_collection_name}}"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "h": 8,
+        "w": 12,
+        "y": 16.0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 6
+    }
+  ],
+  "time": {
+    "to": "now",
+    "from": "now-15m"
+  },
+  "version": 1,
+  "title": "TripGo — Lab 2",
+  "uid": "tripgo-lab2",
+  "schemaVersion": 41,
+  "refresh": "5s"
+}
