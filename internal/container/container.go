@@ -14,8 +14,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Makk228/avito-labs/internal/config"
+	"github.com/Makk228/avito-labs/internal/gateway/push"
 	transport "github.com/Makk228/avito-labs/internal/http"
 	"github.com/Makk228/avito-labs/internal/http/middleware"
+	listhandler "github.com/Makk228/avito-labs/internal/http/position/list"
+	savehandler "github.com/Makk228/avito-labs/internal/http/position/save"
 	createhandler "github.com/Makk228/avito-labs/internal/http/trip/create"
 	finishhandler "github.com/Makk228/avito-labs/internal/http/trip/finish"
 	gethandler "github.com/Makk228/avito-labs/internal/http/trip/get"
@@ -24,11 +27,15 @@ import (
 	"github.com/Makk228/avito-labs/internal/infra/system"
 	"github.com/Makk228/avito-labs/internal/infra/telemetry"
 	"github.com/Makk228/avito-labs/internal/repository/idempotency"
+	positionrepo "github.com/Makk228/avito-labs/internal/repository/position"
 	triprepo "github.com/Makk228/avito-labs/internal/repository/trip"
+	"github.com/Makk228/avito-labs/internal/usecase/position/list"
+	"github.com/Makk228/avito-labs/internal/usecase/position/save"
 	"github.com/Makk228/avito-labs/internal/usecase/trip/create"
 	"github.com/Makk228/avito-labs/internal/usecase/trip/finish"
 	"github.com/Makk228/avito-labs/internal/usecase/trip/get"
 	"github.com/Makk228/avito-labs/internal/worker/keycleanup"
+	"github.com/Makk228/avito-labs/internal/worker/positions"
 )
 
 type Container struct {
@@ -38,6 +45,8 @@ type Container struct {
 	telemetry *telemetry.Providers
 	server    *http.Server
 	cleanup   *keycleanup.Worker
+	positions *positions.Worker
+	push      *push.Gateway
 }
 
 func New(ctx context.Context, cfg config.Config) (*Container, error) {
@@ -89,6 +98,45 @@ func (c *Container) build(ctx context.Context) error {
 	}
 
 	runtime := system.Runtime{}
+	positionMetrics, err := telemetry.NewPositionMetrics(meter)
+	if err != nil {
+		return err
+	}
+
+	c.push, err = push.New(push.Dependencies{IDs: runtime, Traces: c.telemetry.Traces}, push.Config{
+		URL:     c.cfg.Push.URL,
+		Timeout: c.cfg.Push.RequestTimeout,
+	})
+	if err != nil {
+		return err
+	}
+
+	c.positions = positions.New(positions.Dependencies{
+		Trips:   trips,
+		Push:    c.push,
+		Clock:   runtime,
+		Ticker:  &system.Ticker{},
+		Logger:  c.log,
+		Metrics: positionMetrics,
+		Tracer:  c.telemetry.Traces.Tracer("positions"),
+	}, positions.Config{
+		CheckInterval:   c.cfg.Positions.CheckInterval,
+		StaleAfter:      c.cfg.Positions.StaleAfter,
+		Workers:         c.cfg.Positions.Workers,
+		QueueSize:       c.cfg.Positions.QueueSize,
+		RequestTimeout:  c.cfg.Push.RequestTimeout,
+		ShutdownTimeout: c.cfg.ShutdownTimeout,
+	})
+	points := positionrepo.New(c.pool, c.cfg.DB.QueryTimeout)
+	saveUC := save.New(save.Dependencies{
+		Transactions: tx,
+		Trips:        trips,
+		Positions:    points,
+		Queue:        c.positions,
+		Clock:        runtime,
+		Metrics:      positionMetrics,
+	})
+	listUC := list.New(list.Dependencies{Trips: trips, Positions: points})
 	createUC := create.New(create.Dependencies{
 		Transactions: tx,
 		Trips:        trips,
@@ -111,7 +159,14 @@ func (c *Container) build(ctx context.Context) error {
 		return err
 	}
 
-	handler := transport.NewHandler(createhandler.New(createUC), gethandler.New(getUC), finishhandler.New(finishUC), c.pool, c.cfg.DB.QueryTimeout)
+	handler := transport.NewHandler(transport.Dependencies{
+		Create:        createhandler.New(createUC),
+		Get:           gethandler.New(getUC),
+		Finish:        finishhandler.New(finishUC),
+		SavePosition:  savehandler.New(saveUC),
+		ListPositions: listhandler.New(listUC),
+		Database:      c.pool,
+	}, c.cfg.DB.QueryTimeout)
 	c.server = transport.NewServer(c.cfg.HTTP, transport.NewRouter(handler, mw), c.log)
 	c.cleanup = keycleanup.New(keys, c.cfg.Idempotency.CleanupInterval, c.log)
 	return nil
@@ -134,6 +189,7 @@ func (c *Container) Run(ctx context.Context) error {
 	bgCtx, stop := context.WithCancel(context.WithoutCancel(ctx))
 	var background sync.WaitGroup
 	background.Go(func() { c.cleanup.Run(bgCtx) })
+	background.Go(func() { c.positions.Run(bgCtx) })
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- c.server.Serve(listener) }()
 	c.log.InfoContext(ctx, "http server started", slog.String("addr", listener.Addr().String()))
@@ -153,6 +209,10 @@ func (c *Container) Run(ctx context.Context) error {
 	}
 
 	stop()
+	if err := c.positions.Wait(shutdownCtx); err != nil {
+		c.log.ErrorContext(shutdownCtx, "position workers exceeded shutdown budget", slog.Any("error", err))
+		runErr = errors.Join(runErr, err)
+	}
 	done := make(chan struct{})
 	go func() { background.Wait(); close(done) }()
 	select {
@@ -166,6 +226,9 @@ func (c *Container) Run(ctx context.Context) error {
 
 func (c *Container) Close(ctx context.Context) error {
 	var closeErr error
+	if c.push != nil {
+		c.push.Close()
+	}
 	// Final metric collection calls CountActive, so telemetry must flush while
 	// the pool is still open. Tracing is shut down after metric collection.
 	if c.telemetry != nil {

@@ -1,0 +1,13 @@
+PREPARE
+                                                                 QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using trips_active_last_position_idx on trips  (cost=0.27..101.51 rows=67 width=40) (actual time=0.031..0.064 rows=200 loops=1)
+   Index Cond: (COALESCE(last_position_at, started_at) < ('2026-11-20 20:33:11.136464+00'::timestamp with time zone - '00:01:00'::interval))
+   Buffers: shared hit=8
+ Planning:
+   Buffers: shared hit=172
+ Planning Time: 1.424 ms
+ Execution Time: 0.132 ms
+(7 rows)
+
+DEALLOCATE

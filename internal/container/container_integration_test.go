@@ -57,6 +57,13 @@ func TestShutdownCollectsGaugeBeforeClosingDatabase(t *testing.T) {
 			KeyTTL:          time.Hour,
 			CleanupInterval: time.Hour,
 		},
+		Positions: config.Positions{
+			CheckInterval: time.Hour,
+			StaleAfter:    time.Minute,
+			Workers:       2,
+			QueueSize:     10,
+		},
+		Push: config.Push{URL: collector.URL, RequestTimeout: time.Second},
 		Telemetry: config.Telemetry{
 			Endpoint: collector.URL,
 			Protocol: "http/protobuf",

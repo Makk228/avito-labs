@@ -32,6 +32,9 @@ func Trip(t model.Trip) api.Trip {
 	if t.FinishedAt != nil {
 		res.FinishedAt = nullable.NewNullableWithValue(t.FinishedAt.UTC())
 	}
+	if t.LastPositionAt != nil {
+		res.LastPositionAt = nullable.NewNullableWithValue(t.LastPositionAt.UTC())
+	}
 
 	return res
 }

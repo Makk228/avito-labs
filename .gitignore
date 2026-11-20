@@ -11,3 +11,4 @@ bin/
 coverage.out
 coverage-business.out
 artifacts/verification/*.log
+artifacts/lab3/verification/*.log

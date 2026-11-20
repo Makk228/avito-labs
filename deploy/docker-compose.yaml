@@ -11,6 +11,7 @@ x-trip-service: &trip-service
   environment:
     DATABASE_URL: postgres://tripgo:tripgo@postgres:5432/tripgo?sslmode=disable
     OTEL_EXPORTER_OTLP_ENDPOINT: ${COMPOSE_OTLP_ENDPOINT:-http://host.docker.internal:4318}
+    PUSH_HTTP_URL: ${COMPOSE_PUSH_HTTP_URL:-http://host.docker.internal:8090}
 
 services:
   postgres:

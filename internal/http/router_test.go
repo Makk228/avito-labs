@@ -134,7 +134,14 @@ func TestRouterAndRequestLog(t *testing.T) {
 			logger := slog.New(slog.NewJSONHandler(&logs, nil))
 			mw, err := middleware.New(logger, tracenoop.NewTracerProvider(), metricnoop.NewMeterProvider().Meter("test"))
 			require.NoError(t, err)
-			h := transport.NewHandler(NewMockcreateHandler(ctrl), NewMocktripHandler(ctrl), NewMocktripHandler(ctrl), db, time.Second)
+			h := transport.NewHandler(transport.Dependencies{
+				Create:        NewMockcreateHandler(ctrl),
+				Get:           NewMocktripHandler(ctrl),
+				Finish:        NewMocktripHandler(ctrl),
+				SavePosition:  NewMocktripHandler(ctrl),
+				ListPositions: NewMocktripHandler(ctrl),
+				Database:      db,
+			}, time.Second)
 			w := httptest.NewRecorder()
 
 			transport.NewRouter(h, mw).ServeHTTP(w, r)
