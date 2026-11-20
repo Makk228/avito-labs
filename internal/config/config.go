@@ -21,6 +21,20 @@ type Config struct {
 	DB              DB
 	Idempotency     Idempotency
 	Telemetry       Telemetry
+	Positions       Positions
+	Push            Push
+}
+
+type Positions struct {
+	CheckInterval time.Duration `env:"POSITION_CHECK_INTERVAL" envDefault:"30s" validate:"gt=0"`
+	StaleAfter    time.Duration `env:"POSITION_STALE_AFTER" envDefault:"60s" validate:"gt=0"`
+	Workers       int           `env:"POSITION_WORKERS" envDefault:"4" validate:"gt=0"`
+	QueueSize     int           `env:"POSITION_QUEUE_SIZE" envDefault:"100" validate:"gt=0"`
+}
+
+type Push struct {
+	URL            string        `env:"PUSH_HTTP_URL,required,notEmpty" validate:"http_url"`
+	RequestTimeout time.Duration `env:"PUSH_REQUEST_TIMEOUT" envDefault:"1s" validate:"gt=0"`
 }
 
 type HTTP struct {

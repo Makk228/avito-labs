@@ -20,20 +20,33 @@ import (
 )
 
 type Handler struct {
-	create       createHandler
-	get          tripHandler
-	finish       tripHandler
-	db           pinger
-	readyTimeout time.Duration
+	create        createHandler
+	get           tripHandler
+	finish        tripHandler
+	savePosition  tripHandler
+	listPositions tripHandler
+	db            pinger
+	readyTimeout  time.Duration
 }
 
-func NewHandler(create createHandler, get, finish tripHandler, db pinger, timeout time.Duration) *Handler {
+type Dependencies struct {
+	Create        createHandler
+	Get           tripHandler
+	Finish        tripHandler
+	SavePosition  tripHandler
+	ListPositions tripHandler
+	Database      pinger
+}
+
+func NewHandler(deps Dependencies, timeout time.Duration) *Handler {
 	return &Handler{
-		create:       create,
-		get:          get,
-		finish:       finish,
-		db:           db,
-		readyTimeout: timeout,
+		create:        deps.Create,
+		get:           deps.Get,
+		finish:        deps.Finish,
+		savePosition:  deps.SavePosition,
+		listPositions: deps.ListPositions,
+		db:            deps.Database,
+		readyTimeout:  timeout,
 	}
 }
 
@@ -47,6 +60,14 @@ func (h *Handler) GetTrip(w http.ResponseWriter, r *http.Request, id api.TripId)
 
 func (h *Handler) FinishTrip(w http.ResponseWriter, r *http.Request, id api.TripId) {
 	h.finish.Handle(w, r, id)
+}
+
+func (h *Handler) CreateTripPosition(w http.ResponseWriter, r *http.Request, id api.TripId) {
+	h.savePosition.Handle(w, r, id)
+}
+
+func (h *Handler) ListTripPositions(w http.ResponseWriter, r *http.Request, id api.TripId) {
+	h.listPositions.Handle(w, r, id)
 }
 
 func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {

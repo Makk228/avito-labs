@@ -88,7 +88,7 @@ func SQLAttributes(sql string) (string, string) {
 
 	op := strings.ToUpper(fields[0])
 	collection := ""
-	for _, name := range []string{"trips", "trip_status_history", "idempotency_keys"} {
+	for _, name := range []string{"trips", "trip_status_history", "trip_positions", "idempotency_keys"} {
 		for _, field := range fields {
 			if strings.Trim(field, "\"(),;") == name {
 				collection = name

@@ -29,6 +29,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.46.0
 	go.opentelemetry.io/otel/trace v1.46.0
 	go.opentelemetry.io/proto/otlp v1.11.0
+	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.6.0
 	google.golang.org/protobuf v1.36.12
 )

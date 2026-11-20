@@ -1,0 +1,159 @@
+{
+  "checked_at": "2026-11-20T20:42:31.598Z",
+  "configuration": {
+    "trips": 5000,
+    "stale_active": 200,
+    "workers": 4,
+    "queue_size": 10,
+    "check_interval": "30s",
+    "push_latency": "5s",
+    "request_timeout": "3s"
+  },
+  "metrics": {
+    "maximum_queue": [
+      {
+        "metric": {
+          "deployment_environment": "local",
+          "exported_job": "tripgo/trip-service",
+          "instance": "otel-collector:8889",
+          "job": "otel-collector",
+          "otel_scope_name": "trip-service",
+          "service_name": "trip-service",
+          "service_namespace": "tripgo",
+          "service_version": "lab3-review"
+        },
+        "value": [
+          1795207351.637,
+          "6"
+        ]
+      }
+    ],
+    "maximum_workers": [
+      {
+        "metric": {
+          "deployment_environment": "local",
+          "exported_job": "tripgo/trip-service",
+          "instance": "otel-collector:8889",
+          "job": "otel-collector",
+          "otel_scope_name": "trip-service",
+          "service_name": "trip-service",
+          "service_namespace": "tripgo",
+          "service_version": "lab3-review"
+        },
+        "value": [
+          1795207351.649,
+          "4"
+        ]
+      }
+    ],
+    "stale_checks": [
+      {
+        "metric": {
+          "__name__": "tripgo_stale_checks_total",
+          "deployment_environment": "local",
+          "exported_job": "tripgo/trip-service",
+          "instance": "otel-collector:8889",
+          "job": "otel-collector",
+          "otel_scope_name": "trip-service",
+          "result": "dropped",
+          "service_name": "trip-service",
+          "service_namespace": "tripgo",
+          "service_version": "lab3-review"
+        },
+        "value": [
+          1795207351.652,
+          "3720"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "tripgo_stale_checks_total",
+          "deployment_environment": "local",
+          "exported_job": "tripgo/trip-service",
+          "instance": "otel-collector:8889",
+          "job": "otel-collector",
+          "otel_scope_name": "trip-service",
+          "result": "queued",
+          "service_name": "trip-service",
+          "service_namespace": "tripgo",
+          "service_version": "lab3-review"
+        },
+        "value": [
+          1795207351.652,
+          "280"
+        ]
+      }
+    ],
+    "requests": [
+      {
+        "metric": {
+          "__name__": "tripgo_position_requests_total",
+          "deployment_environment": "local",
+          "exported_job": "tripgo/trip-service",
+          "instance": "otel-collector:8889",
+          "job": "otel-collector",
+          "otel_scope_name": "trip-service",
+          "result": "error",
+          "service_name": "trip-service",
+          "service_namespace": "tripgo",
+          "service_version": "lab3-review"
+        },
+        "value": [
+          1795207351.655,
+          "280"
+        ]
+      }
+    ],
+    "positions_saved": [
+      {
+        "metric": {
+          "__name__": "tripgo_positions_saved_total",
+          "deployment_environment": "local",
+          "exported_job": "tripgo/trip-service",
+          "instance": "otel-collector:8889",
+          "job": "otel-collector",
+          "otel_scope_name": "trip-service",
+          "service_name": "trip-service",
+          "service_namespace": "tripgo",
+          "service_version": "lab3-review"
+        },
+        "value": [
+          1795207351.66,
+          "3"
+        ]
+      }
+    ],
+    "duration_count": [
+      {
+        "metric": {
+          "__name__": "tripgo_position_requests_duration_seconds_count",
+          "deployment_environment": "local",
+          "exported_job": "tripgo/trip-service",
+          "instance": "otel-collector:8889",
+          "job": "otel-collector",
+          "otel_scope_name": "trip-service",
+          "result": "error",
+          "service_name": "trip-service",
+          "service_namespace": "tripgo",
+          "service_version": "lab3-review"
+        },
+        "value": [
+          1795207351.664,
+          "280"
+        ]
+      }
+    ]
+  },
+  "shutdown": {
+    "queue_before": 6,
+    "active_before": 4,
+    "duration_ms": 6767.07,
+    "exit_code": 0
+  },
+  "restart": {
+    "started_at": "2026-11-20T20:43:14.28Z",
+    "logs_before_lines": 10,
+    "verified": true,
+    "successful_requests": 56.0
+  }
+}

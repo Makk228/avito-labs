@@ -11,6 +11,7 @@ COMPOSE      := docker compose -f deploy/docker-compose.yaml
 
 DOCKER_DATABASE_URL = $(subst @127.0.0.1:,@host.docker.internal:,$(subst @localhost:,@host.docker.internal:,$(DATABASE_URL)))
 DOCKER_OTLP_ENDPOINT = $(subst //127.0.0.1:,//host.docker.internal:,$(subst //localhost:,//host.docker.internal:,$(OTEL_EXPORTER_OTLP_ENDPOINT)))
+DOCKER_PUSH_URL = $(subst //127.0.0.1:,//host.docker.internal:,$(subst //localhost:,//host.docker.internal:,$(PUSH_HTTP_URL)))
 DOCKER_RUN = docker run --rm --add-host=host.docker.internal:host-gateway \
 	--env-file .env.example -e DATABASE_URL="$(DOCKER_DATABASE_URL)" \
 	-e OTEL_EXPORTER_OTLP_ENDPOINT="$(DOCKER_OTLP_ENDPOINT)" \
@@ -18,6 +19,9 @@ DOCKER_RUN = docker run --rm --add-host=host.docker.internal:host-gateway \
 	-e OTEL_TRACES_SAMPLER="$(OTEL_TRACES_SAMPLER)" \
 	-e OTEL_TRACES_SAMPLER_ARG="$(OTEL_TRACES_SAMPLER_ARG)" \
 	-e OTEL_RESOURCE_ATTRIBUTES="$(OTEL_RESOURCE_ATTRIBUTES)" \
+	-e PUSH_HTTP_URL="$(DOCKER_PUSH_URL)" -e PUSH_REQUEST_TIMEOUT="$(PUSH_REQUEST_TIMEOUT)" \
+	-e POSITION_CHECK_INTERVAL="$(POSITION_CHECK_INTERVAL)" -e POSITION_STALE_AFTER="$(POSITION_STALE_AFTER)" \
+	-e POSITION_WORKERS="$(POSITION_WORKERS)" -e POSITION_QUEUE_SIZE="$(POSITION_QUEUE_SIZE)" \
 	-e LOG_LEVEL="$(LOG_LEVEL)" -e SERVICE_VERSION="$(SERVICE_VERSION)"
 
 .DEFAULT_GOAL := build

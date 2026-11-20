@@ -14,13 +14,25 @@ import (
 )
 
 func (r *TripRepository) Get(ctx context.Context, id uuid.UUID) (trip.Trip, error) {
+	return r.get(ctx, id, false)
+}
+
+func (r *TripRepository) GetForUpdate(ctx context.Context, id uuid.UUID) (trip.Trip, error) {
+	return r.get(ctx, id, true)
+}
+
+func (r *TripRepository) get(ctx context.Context, id uuid.UUID, lock bool) (trip.Trip, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
-	query, args, err := psql.Select(tripColumns...).
+	builder := psql.Select(tripColumns...).
 		From("trips").
-		Where(squirrel.Eq{"id": id}).
-		ToSql()
+		Where(squirrel.Eq{"id": id})
+	if lock {
+		builder = builder.Suffix("FOR UPDATE")
+	}
+
+	query, args, err := builder.ToSql()
 	if err != nil {
 		return trip.Trip{}, fmt.Errorf("build select trip query: %w", err)
 	}
