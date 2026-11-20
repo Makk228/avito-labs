@@ -4,8 +4,6 @@ package finish
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -13,46 +11,76 @@ import (
 	"github.com/Makk228/avito-labs/internal/model"
 )
 
+type Dependencies struct {
+	Transactions txManager
+	Trips        tripRepository
+	Clock        clock
+	Logger       logger
+	Metrics      metrics
+}
+
 type Usecase struct {
 	tx      txManager
 	trips   tripRepository
-	log     *slog.Logger
+	clock   clock
+	log     logger
 	metrics metrics
 }
 
-func New(tx txManager, trips tripRepository, log *slog.Logger, counters metrics) *Usecase {
-	return &Usecase{tx: tx, trips: trips, log: log, metrics: counters}
+func New(deps Dependencies) *Usecase {
+	return &Usecase{
+		tx:      deps.Transactions,
+		trips:   deps.Trips,
+		clock:   deps.Clock,
+		log:     deps.Logger,
+		metrics: deps.Metrics,
+	}
 }
 
 func (u *Usecase) Finish(ctx context.Context, id uuid.UUID) (model.Trip, error) {
 	var result model.Trip
-	err := u.tx.Do(ctx, func(ctx context.Context) error {
-		t, err := u.trips.Get(ctx, id)
+	err := u.tx.Do(ctx, func(txCtx context.Context) error {
+		value, err := u.trips.Get(txCtx, id)
 		if err != nil {
 			return fmt.Errorf("fetch trip: %w", err)
 		}
-		at := time.Now().UTC().Truncate(time.Microsecond)
-		if err := t.Finish(at); err != nil {
+
+		at := u.clock.Now()
+		if err := value.Finish(at); err != nil {
 			return err
 		}
-		updated, ok, err := u.trips.FinishActive(ctx, id, at)
+
+		updated, err := u.trips.FinishActive(txCtx, id, at)
 		if err != nil {
 			return fmt.Errorf("persist completion: %w", err)
 		}
-		if !ok {
+
+		if !updated.Updated {
 			return trip.ErrTripCompleted
 		}
+
 		from := trip.StatusActive
-		if err := u.trips.AddStatusChange(ctx, model.StatusChange{TripID: id, From: &from, To: t.Status, Reason: "trip finished", ChangedAt: at}); err != nil {
+		history := model.StatusChange{
+			TripID:    id,
+			From:      &from,
+			To:        value.Status,
+			Reason:    "trip finished",
+			ChangedAt: at,
+		}
+
+		if err := u.trips.AddStatusChange(txCtx, history); err != nil {
 			return fmt.Errorf("record completion: %w", err)
 		}
-		result = updated
+
+		result = updated.Trip
 		return nil
 	})
 	if err != nil {
 		return model.Trip{}, fmt.Errorf("finish trip transaction: %w", err)
 	}
+
 	u.metrics.Completed(ctx)
-	u.log.InfoContext(ctx, "trip finished", slog.String("trip_id", id.String()))
+	u.log.InfoContext(ctx, "trip finished", "trip_id", id.String())
+
 	return result, nil
 }

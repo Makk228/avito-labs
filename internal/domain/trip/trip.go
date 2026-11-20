@@ -3,7 +3,6 @@ package trip
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -19,8 +18,8 @@ const (
 )
 
 type Point struct {
-	Latitude  float64
-	Longitude float64
+	Latitude  float64 `json:"latitude" validate:"gte=-90,lte=90"`
+	Longitude float64 `json:"longitude" validate:"gte=-180,lte=180"`
 }
 
 type Trip struct {
@@ -36,11 +35,11 @@ type Trip struct {
 }
 
 type NewTrip struct {
-	UserID   uuid.UUID
-	DriverID uuid.UUID
-	Start    Point
-	End      Point
-	Price    int64
+	UserID   uuid.UUID `json:"user_id" validate:"required"`
+	DriverID uuid.UUID `json:"driver_id" validate:"required"`
+	Start    Point     `json:"start_point"`
+	End      Point     `json:"end_point"`
+	Price    int64     `json:"price" validate:"gte=0"`
 }
 
 func (n NewTrip) Fingerprint() string {
@@ -53,6 +52,7 @@ func (n NewTrip) Fingerprint() string {
 		formatFloat(n.End.Longitude),
 		strconv.FormatInt(n.Price, 10),
 	}
+
 	sum := sha256.Sum256([]byte(strings.Join(parts, "|")))
 	return hex.EncodeToString(sum[:])
 }
@@ -74,36 +74,12 @@ type IdempotencyRecord struct {
 	TripID      uuid.UUID
 }
 
-// Validate checks the domain constraints, including non-finite coordinates.
-func (n NewTrip) Validate() error {
-	if n.UserID == uuid.Nil {
-		return &ValidationError{Field: "user_id", Message: "must not be empty"}
-	}
-	if n.DriverID == uuid.Nil {
-		return &ValidationError{Field: "driver_id", Message: "must not be empty"}
-	}
-	for _, p := range []struct {
-		name  string
-		point Point
-	}{{"start_point", n.Start}, {"end_point", n.End}} {
-		if math.IsNaN(p.point.Latitude) || math.IsInf(p.point.Latitude, 0) || p.point.Latitude < -90 || p.point.Latitude > 90 {
-			return &ValidationError{Field: p.name + ".latitude", Message: "must be between -90 and 90"}
-		}
-		if math.IsNaN(p.point.Longitude) || math.IsInf(p.point.Longitude, 0) || p.point.Longitude < -180 || p.point.Longitude > 180 {
-			return &ValidationError{Field: p.name + ".longitude", Message: "must be between -180 and 180"}
-		}
-	}
-	if n.Price < 0 {
-		return &ValidationError{Field: "price", Message: "must be greater than or equal to 0"}
-	}
-	return nil
-}
-
 // Finish applies the only permitted completion transition.
 func (t *Trip) Finish(at time.Time) error {
 	if t.Status != StatusActive {
 		return ErrTripCompleted
 	}
+
 	t.Status = StatusCompleted
 	t.FinishedAt = &at
 	return nil

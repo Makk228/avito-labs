@@ -19,5 +19,6 @@ func (u *Usecase) Get(ctx context.Context, id uuid.UUID) (model.Trip, error) {
 	if err != nil {
 		return model.Trip{}, fmt.Errorf("get trip: %w", err)
 	}
+
 	return t, nil
 }

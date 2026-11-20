@@ -28,3 +28,15 @@ type idempotencyStore interface {
 }
 
 type metrics interface{ Created(context.Context) }
+
+type logger interface {
+	InfoContext(context.Context, string, ...any)
+}
+
+type clock interface {
+	Now() time.Time
+}
+
+type idGenerator interface {
+	NewID() uuid.UUID
+}

@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metricpb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/protobuf/proto"
@@ -36,22 +38,22 @@ func TestOTLPHTTPExport(t *testing.T) {
 					w.WriteHeader(http.StatusBadRequest)
 					return
 				}
+
 				switch r.URL.Path {
 				case prefix + "/v1/traces":
 					var data tracepb.ExportTraceServiceRequest
-					if err := proto.Unmarshal(body, &data); err != nil || len(data.ResourceSpans) == 0 {
-						t.Errorf("invalid trace payload: %v", err)
-					}
+					assert.NoError(t, proto.Unmarshal(body, &data))
+					assert.NotEmpty(t, data.ResourceSpans)
 				case prefix + "/v1/metrics":
 					var data metricpb.ExportMetricsServiceRequest
-					if err := proto.Unmarshal(body, &data); err != nil || len(data.ResourceMetrics) == 0 {
-						t.Errorf("invalid metric payload: %v", err)
-					}
+					assert.NoError(t, proto.Unmarshal(body, &data))
+					assert.NotEmpty(t, data.ResourceMetrics)
 				default:
 					t.Errorf("incorrect OTLP path: %s", r.URL.Path)
 					w.WriteHeader(http.StatusNotFound)
 					return
 				}
+
 				mu.Lock()
 				paths[r.URL.Path]++
 				mu.Unlock()
@@ -61,33 +63,28 @@ func TestOTLPHTTPExport(t *testing.T) {
 			defer server.Close()
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			providers, err := telemetry.New(ctx, config.Telemetry{Endpoint: server.URL + prefix, Protocol: "http/protobuf", Version: "test"}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
-			if err != nil {
-				t.Fatal(err)
+			cfg := config.Telemetry{
+				Endpoint: server.URL + prefix,
+				Protocol: "http/protobuf",
+				Version:  "test",
 			}
+
+			providers, err := telemetry.New(ctx, cfg, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+			require.NoError(t, err)
 			defer func() {
-				if err := providers.Shutdown(ctx); err != nil {
-					t.Error(err)
-				}
+				assert.NoError(t, providers.Shutdown(ctx))
 			}()
 			_, span := providers.Traces.Tracer("test").Start(ctx, "export-test")
 			span.End()
 			counter, err := providers.Meters.Meter("test").Int64Counter("export.test")
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			counter.Add(ctx, 1)
-			if err := providers.Traces.ForceFlush(ctx); err != nil {
-				t.Fatal(err)
-			}
-			if err := providers.Meters.ForceFlush(ctx); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, providers.Traces.ForceFlush(ctx))
+			require.NoError(t, providers.Meters.ForceFlush(ctx))
 			mu.Lock()
 			defer mu.Unlock()
-			if paths[prefix+"/v1/traces"] != 1 || paths[prefix+"/v1/metrics"] != 1 {
-				t.Fatalf("missing signal requests: %v", paths)
-			}
+			assert.Equal(t, 1, paths[prefix+"/v1/traces"])
+			assert.Equal(t, 1, paths[prefix+"/v1/metrics"])
 		})
 	}
 }

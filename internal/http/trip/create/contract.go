@@ -11,5 +11,5 @@ import (
 )
 
 type usecase interface {
-	Create(context.Context, model.NewTrip, *uuid.UUID) (model.Trip, bool, error)
+	Create(context.Context, model.NewTrip, *uuid.UUID) (model.CreateTripResult, error)
 }

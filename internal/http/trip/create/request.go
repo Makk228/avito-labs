@@ -31,11 +31,14 @@ func decodeCreateTrip(w http.ResponseWriter, r *http.Request) (trip.NewTrip, err
 		if errors.As(err, &tooLarge) {
 			return trip.NewTrip{}, fmt.Errorf("request body must not exceed %d bytes", tooLarge.Limit)
 		}
+
 		return trip.NewTrip{}, errors.New("failed to read request body")
 	}
+
 	if len(bytes.TrimSpace(body)) == 0 {
 		return trip.NewTrip{}, errors.New("request body is required")
 	}
+
 	if !json.Valid(body) {
 		return trip.NewTrip{}, errors.New("request body is not valid JSON")
 	}
@@ -69,27 +72,33 @@ func checkFields(body []byte) error {
 	if err != nil {
 		return err
 	}
+
 	if err := requireFields(fields, "", tripDataRequired); err != nil {
 		return err
 	}
+
 	for _, point := range []string{"start_point", "end_point"} {
 		nested, err := objectFields(fields[point], point)
 		if err != nil {
 			return err
 		}
+
 		if err := requireFields(nested, point+".", coordinatesRequired); err != nil {
 			return err
 		}
 	}
+
 	for _, name := range []string{"user_id", "driver_id"} {
 		var s string
 		if err := json.Unmarshal(fields[name], &s); err != nil {
 			return fmt.Errorf("field %s must be a string", name)
 		}
+
 		if _, err := uuid.Parse(s); err != nil {
 			return fmt.Errorf("field %s must be a valid UUID", name)
 		}
 	}
+
 	return nil
 }
 
@@ -98,6 +107,7 @@ func objectFields(data []byte, name string) (map[string]json.RawMessage, error) 
 	if err := json.Unmarshal(data, &fields); err != nil || fields == nil {
 		return nil, fmt.Errorf("%s must be a JSON object", name)
 	}
+
 	return fields, nil
 }
 
@@ -109,9 +119,11 @@ func requireFields(fields map[string]json.RawMessage, prefix string, names []str
 			missing = append(missing, prefix+name)
 		}
 	}
+
 	if len(missing) > 0 {
 		return fmt.Errorf("required fields are missing: %s", strings.Join(missing, ", "))
 	}
+
 	return nil
 }
 
@@ -131,6 +143,7 @@ func jsonType(t reflect.Type) string {
 	if t == uuidType {
 		return "string (uuid)"
 	}
+
 	switch t.Kind() {
 	case reflect.Int, reflect.Int32, reflect.Int64:
 		return "integer"
@@ -144,5 +157,11 @@ func jsonType(t reflect.Type) string {
 }
 
 func validateTripData(req api.TripData) error {
-	return (trip.NewTrip{UserID: req.UserId, DriverID: req.DriverId, Start: trip.Point{Latitude: req.StartPoint.Latitude, Longitude: req.StartPoint.Longitude}, End: trip.Point{Latitude: req.EndPoint.Latitude, Longitude: req.EndPoint.Longitude}, Price: req.Price}).Validate()
+	return (trip.NewTrip{
+		UserID:   req.UserId,
+		DriverID: req.DriverId,
+		Start:    trip.Point{Latitude: req.StartPoint.Latitude, Longitude: req.StartPoint.Longitude},
+		End:      trip.Point{Latitude: req.EndPoint.Latitude, Longitude: req.EndPoint.Longitude},
+		Price:    req.Price,
+	}).Validate()
 }

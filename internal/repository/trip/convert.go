@@ -27,6 +27,7 @@ func scanTrip(row pgx.Row) (trip.Trip, error) {
 	if err != nil {
 		return trip.Trip{}, err
 	}
+
 	t.Status = trip.Status(status)
 	return t, nil
 }

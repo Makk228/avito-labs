@@ -12,7 +12,9 @@ import (
 type createHandler interface {
 	Handle(http.ResponseWriter, *http.Request, api.CreateTripParams)
 }
+
 type tripHandler interface {
 	Handle(http.ResponseWriter, *http.Request, api.TripId)
 }
+
 type pinger interface{ Ping(context.Context) error }

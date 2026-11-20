@@ -20,6 +20,7 @@ func (h traceHandler) Handle(ctx context.Context, record slog.Record) error {
 	} else {
 		record.AddAttrs(slog.String("trace_id", ""), slog.String("span_id", ""))
 	}
+
 	return h.Handler.Handle(ctx, record)
 }
 

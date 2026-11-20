@@ -13,6 +13,7 @@ import (
 
 	"github.com/Makk228/avito-labs/internal/domain/trip"
 	"github.com/Makk228/avito-labs/internal/infra/postgres/transaction"
+	"github.com/Makk228/avito-labs/internal/model"
 )
 
 func (r *TripRepository) Create(ctx context.Context, t trip.Trip) error {
@@ -43,12 +44,14 @@ func (r *TripRepository) Create(ctx context.Context, t trip.Trip) error {
 		if isUniqueViolation(err, driverActiveTripIndex) {
 			return trip.ErrDriverBusy
 		}
+
 		return fmt.Errorf("insert trip: %w", err)
 	}
+
 	return nil
 }
 
-func (r *TripRepository) FinishActive(ctx context.Context, id uuid.UUID, finishedAt time.Time) (trip.Trip, bool, error) {
+func (r *TripRepository) FinishActive(ctx context.Context, id uuid.UUID, finishedAt time.Time) (model.FinishTripResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
@@ -60,17 +63,19 @@ func (r *TripRepository) FinishActive(ctx context.Context, id uuid.UUID, finishe
 		Suffix("RETURNING " + strings.Join(tripColumns, ", ")).
 		ToSql()
 	if err != nil {
-		return trip.Trip{}, false, fmt.Errorf("build finish trip query: %w", err)
+		return model.FinishTripResult{}, fmt.Errorf("build finish trip query: %w", err)
 	}
 
 	t, err := scanTrip(transaction.Conn(ctx, r.pool).QueryRow(ctx, query, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return trip.Trip{}, false, nil
+		return model.FinishTripResult{}, nil
 	}
+
 	if err != nil {
-		return trip.Trip{}, false, fmt.Errorf("finish trip: %w", err)
+		return model.FinishTripResult{}, fmt.Errorf("finish trip: %w", err)
 	}
-	return t, true, nil
+
+	return model.FinishTripResult{Trip: t, Updated: true}, nil
 }
 
 func (r *TripRepository) AddStatusChange(ctx context.Context, c trip.StatusChange) error {
@@ -94,5 +99,6 @@ func (r *TripRepository) AddStatusChange(ctx context.Context, c trip.StatusChang
 	if _, err := transaction.Conn(ctx, r.pool).Exec(ctx, query, args...); err != nil {
 		return fmt.Errorf("insert status change: %w", err)
 	}
+
 	return nil
 }

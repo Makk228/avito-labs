@@ -28,7 +28,13 @@ type Handler struct {
 }
 
 func NewHandler(create createHandler, get, finish tripHandler, db pinger, timeout time.Duration) *Handler {
-	return &Handler{create: create, get: get, finish: finish, db: db, readyTimeout: timeout}
+	return &Handler{
+		create:       create,
+		get:          get,
+		finish:       finish,
+		db:           db,
+		readyTimeout: timeout,
+	}
 }
 
 func (h *Handler) CreateTrip(w http.ResponseWriter, r *http.Request, p api.CreateTripParams) {
@@ -55,11 +61,20 @@ func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
 		respond.JSON(w, http.StatusServiceUnavailable, api.HealthResponse{Status: api.Unavailable})
 		return
 	}
+
 	respond.JSON(w, http.StatusOK, api.HealthResponse{Status: api.Ok})
 }
 
 func NewServer(cfg config.HTTP, handler http.Handler, log *slog.Logger) *http.Server {
-	return &http.Server{Addr: cfg.Addr, Handler: handler, ReadTimeout: cfg.ReadTimeout, ReadHeaderTimeout: cfg.ReadHeaderTimeout, WriteTimeout: cfg.WriteTimeout, IdleTimeout: cfg.IdleTimeout, ErrorLog: slog.NewLogLogger(log.Handler(), slog.LevelWarn)}
+	return &http.Server{
+		Addr:              cfg.Addr,
+		Handler:           handler,
+		ReadTimeout:       cfg.ReadTimeout,
+		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+		WriteTimeout:      cfg.WriteTimeout,
+		IdleTimeout:       cfg.IdleTimeout,
+		ErrorLog:          slog.NewLogLogger(log.Handler(), slog.LevelWarn),
+	}
 }
 
 func NewRouter(h *Handler, mw *middleware.Middleware) http.Handler {
@@ -74,6 +89,7 @@ func NewRouter(h *Handler, mw *middleware.Middleware) http.Handler {
 				allowed = append(allowed, method)
 			}
 		}
+
 		w.Header().Set("Allow", strings.Join(allowed, ", "))
 		respond.Routing(w, r, http.StatusMethodNotAllowed, "method-not-allowed", "Method not allowed", "method_not_allowed", fmt.Sprintf("Method %s is not allowed for this route", r.Method))
 	})
@@ -85,6 +101,7 @@ func NewRouter(h *Handler, mw *middleware.Middleware) http.Handler {
 				return ctx.RoutePattern()
 			}
 		}
+
 		return "unmatched"
 	})
 }
@@ -99,5 +116,6 @@ func paramError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.As(err, &many):
 		detail = fmt.Sprintf("Parameter %s must be passed once", many.ParamName)
 	}
+
 	respond.Invalid(w, r, detail)
 }

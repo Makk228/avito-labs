@@ -13,7 +13,7 @@ import (
 
 type tripRepository interface {
 	Get(context.Context, uuid.UUID) (model.Trip, error)
-	FinishActive(context.Context, uuid.UUID, time.Time) (model.Trip, bool, error)
+	FinishActive(context.Context, uuid.UUID, time.Time) (model.FinishTripResult, error)
 	AddStatusChange(context.Context, model.StatusChange) error
 }
 
@@ -22,3 +22,11 @@ type txManager interface {
 }
 
 type metrics interface{ Completed(context.Context) }
+
+type logger interface {
+	InfoContext(context.Context, string, ...any)
+}
+
+type clock interface {
+	Now() time.Time
+}

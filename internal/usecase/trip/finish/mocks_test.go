@@ -58,13 +58,12 @@ func (mr *MocktripRepositoryMockRecorder) AddStatusChange(arg0, arg1 any) *gomoc
 }
 
 // FinishActive mocks base method.
-func (m *MocktripRepository) FinishActive(arg0 context.Context, arg1 uuid.UUID, arg2 time.Time) (model.Trip, bool, error) {
+func (m *MocktripRepository) FinishActive(arg0 context.Context, arg1 uuid.UUID, arg2 time.Time) (model.FinishTripResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FinishActive", arg0, arg1, arg2)
-	ret0, _ := ret[0].(model.Trip)
-	ret1, _ := ret[1].(bool)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret0, _ := ret[0].(model.FinishTripResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // FinishActive indicates an expected call of FinishActive.
@@ -160,4 +159,83 @@ func (m *Mockmetrics) Completed(arg0 context.Context) {
 func (mr *MockmetricsMockRecorder) Completed(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Completed", reflect.TypeOf((*Mockmetrics)(nil).Completed), arg0)
+}
+
+// Mocklogger is a mock of logger interface.
+type Mocklogger struct {
+	ctrl     *gomock.Controller
+	recorder *MockloggerMockRecorder
+	isgomock struct{}
+}
+
+// MockloggerMockRecorder is the mock recorder for Mocklogger.
+type MockloggerMockRecorder struct {
+	mock *Mocklogger
+}
+
+// NewMocklogger creates a new mock instance.
+func NewMocklogger(ctrl *gomock.Controller) *Mocklogger {
+	mock := &Mocklogger{ctrl: ctrl}
+	mock.recorder = &MockloggerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *Mocklogger) EXPECT() *MockloggerMockRecorder {
+	return m.recorder
+}
+
+// InfoContext mocks base method.
+func (m *Mocklogger) InfoContext(arg0 context.Context, arg1 string, arg2 ...any) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	m.ctrl.Call(m, "InfoContext", varargs...)
+}
+
+// InfoContext indicates an expected call of InfoContext.
+func (mr *MockloggerMockRecorder) InfoContext(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InfoContext", reflect.TypeOf((*Mocklogger)(nil).InfoContext), varargs...)
+}
+
+// Mockclock is a mock of clock interface.
+type Mockclock struct {
+	ctrl     *gomock.Controller
+	recorder *MockclockMockRecorder
+	isgomock struct{}
+}
+
+// MockclockMockRecorder is the mock recorder for Mockclock.
+type MockclockMockRecorder struct {
+	mock *Mockclock
+}
+
+// NewMockclock creates a new mock instance.
+func NewMockclock(ctrl *gomock.Controller) *Mockclock {
+	mock := &Mockclock{ctrl: ctrl}
+	mock.recorder = &MockclockMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *Mockclock) EXPECT() *MockclockMockRecorder {
+	return m.recorder
+}
+
+// Now mocks base method.
+func (m *Mockclock) Now() time.Time {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Now")
+	ret0, _ := ret[0].(time.Time)
+	return ret0
+}
+
+// Now indicates an expected call of Now.
+func (mr *MockclockMockRecorder) Now() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Now", reflect.TypeOf((*Mockclock)(nil).Now))
 }

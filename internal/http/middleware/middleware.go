@@ -24,12 +24,28 @@ import (
 	"github.com/Makk228/avito-labs/internal/http/respond"
 )
 
+// HTTP latency histogram boundaries, in seconds, from 5 ms to 10 s.
+var requestDurationBuckets = []float64{
+	0.005,
+	0.01,
+	0.025,
+	0.05,
+	0.1,
+	0.25,
+	0.5,
+	1,
+	2.5,
+	5,
+	10,
+}
+
 type Middleware struct {
 	log      *slog.Logger
 	tracer   trace.TracerProvider
 	duration metric.Float64Histogram
 	active   metric.Int64UpDownCounter
 }
+
 type (
 	stateKey struct{}
 	response struct {
@@ -53,19 +69,23 @@ func (w *response) Write(body []byte) (int, error) {
 	if !w.written {
 		w.WriteHeader(http.StatusOK)
 	}
+
 	return w.body.Write(body)
 }
+
 func (w *response) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 
 func New(log *slog.Logger, tp trace.TracerProvider, meter metric.Meter) (*Middleware, error) {
-	duration, err := meter.Float64Histogram("http.server.request.duration", metric.WithUnit("s"), metric.WithExplicitBucketBoundaries(.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10))
+	duration, err := meter.Float64Histogram("http.server.request.duration", metric.WithUnit("s"), metric.WithExplicitBucketBoundaries(requestDurationBuckets...))
 	if err != nil {
 		return nil, fmt.Errorf("create request histogram: %w", err)
 	}
+
 	active, err := meter.Int64UpDownCounter("http.server.active_requests", metric.WithUnit("{request}"))
 	if err != nil {
 		return nil, fmt.Errorf("create active requests metric: %w", err)
 	}
+
 	return &Middleware{log: log, tracer: tp, duration: duration, active: active}, nil
 }
 
@@ -89,12 +109,14 @@ func (m *Middleware) recoverer(next http.Handler) http.Handler {
 				if err, ok := p.(error); ok && errors.Is(err, http.ErrAbortHandler) {
 					panic(p)
 				}
+
 				state := r.Context().Value(stateKey{}).(*response)
 				state.body.Reset()
 				state.written = false
 				for name := range w.Header() {
 					w.Header().Del(name)
 				}
+
 				m.log.ErrorContext(state.ctx, "panic in http handler", slog.Any("panic", p), slog.String("stack", string(debug.Stack())))
 				respond.Error(w, r, errors.New("handler panic"))
 			}
@@ -114,8 +136,9 @@ func (m *Middleware) tracing(next http.Handler) http.Handler {
 			if !complete {
 				state.status = http.StatusInternalServerError
 			}
+
 			span.SetAttributes(attribute.Int("http.response.status_code", state.status))
-			if state.status >= 400 {
+			if state.status >= http.StatusBadRequest {
 				errorType := strconv.Itoa(state.status)
 				span.SetStatus(codes.Error, errorType)
 				span.SetAttributes(attribute.String("error.type", errorType))
@@ -124,9 +147,16 @@ func (m *Middleware) tracing(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 		complete = true
 	})
-	return otelhttp.NewHandler(inner, "HTTP", otelhttp.WithTracerProvider(m.tracer), otelhttp.WithMeterProvider(noop.NewMeterProvider()), otelhttp.WithPropagators(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})), otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
-		return r.Method + " " + r.Context().Value(stateKey{}).(*response).route
-	}))
+	return otelhttp.NewHandler(inner, "HTTP",
+		otelhttp.WithTracerProvider(m.tracer),
+		otelhttp.WithMeterProvider(noop.NewMeterProvider()),
+		otelhttp.WithPropagators(propagation.NewCompositeTextMapPropagator(
+			propagation.TraceContext{}, propagation.Baggage{},
+		)),
+		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
+			return r.Method + " " + r.Context().Value(stateKey{}).(*response).route
+		}),
+	)
 }
 
 func (m *Middleware) logging(next http.Handler) http.Handler {
@@ -135,13 +165,21 @@ func (m *Middleware) logging(next http.Handler) http.Handler {
 		state := r.Context().Value(stateKey{}).(*response)
 		defer func() {
 			level := slog.LevelInfo
-			if state.status >= 500 {
+			if state.status >= http.StatusInternalServerError {
 				level = slog.LevelError
 			}
-			attrs := []any{slog.String("method", r.Method), slog.String("route", state.route), slog.Int("status", state.status), slog.Int64("duration_ms", time.Since(start).Milliseconds())}
-			if err := requeststate.Error(r.Context()); err != nil && state.status >= 500 {
+
+			attrs := []any{
+				slog.String("method", r.Method),
+				slog.String("route", state.route),
+				slog.Int("status", state.status),
+				slog.Int64("duration_ms", time.Since(start).Milliseconds()),
+			}
+
+			if err := requeststate.Error(r.Context()); err != nil && state.status >= http.StatusInternalServerError {
 				attrs = append(attrs, slog.Any("error", err))
 			}
+
 			m.log.Log(r.Context(), level, "request handled", attrs...)
 		}()
 		next.ServeHTTP(w, r)
@@ -159,6 +197,7 @@ func (m *Middleware) metrics(next http.Handler) http.Handler {
 			if !complete {
 				state.status = http.StatusInternalServerError
 			}
+
 			m.active.Add(r.Context(), -1, metric.WithAttributes(attrs...))
 			attrs = append(attrs, attribute.Int("http.response.status_code", state.status))
 			m.duration.Record(r.Context(), time.Since(start).Seconds(), metric.WithAttributes(attrs...))

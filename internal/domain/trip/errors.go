@@ -22,5 +22,6 @@ func (e *ValidationError) Error() string {
 	if e.Field == "" {
 		return e.Message
 	}
+
 	return fmt.Sprintf("%s %s", e.Field, e.Message)
 }

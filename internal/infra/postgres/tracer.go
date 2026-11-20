@@ -23,6 +23,7 @@ type QueryTracer struct {
 	*otelpgx.Tracer
 	duration metric.Float64Histogram
 }
+
 type (
 	queryKey  struct{}
 	queryInfo struct {
@@ -37,7 +38,14 @@ func NewQueryTracer(tp trace.TracerProvider, meter metric.Meter) (*QueryTracer, 
 	if err != nil {
 		return nil, fmt.Errorf("create database histogram: %w", err)
 	}
-	base := otelpgx.NewTracer(otelpgx.WithTracerProvider(tp), otelpgx.WithMeterProvider(noop.NewMeterProvider()), otelpgx.WithTrimSQLInSpanName(), otelpgx.WithDisableSQLStatementInAttributes(), otelpgx.WithDisableConnectionDetailsInAttributes())
+
+	base := otelpgx.NewTracer(
+		otelpgx.WithTracerProvider(tp),
+		otelpgx.WithMeterProvider(noop.NewMeterProvider()),
+		otelpgx.WithTrimSQLInSpanName(),
+		otelpgx.WithDisableSQLStatementInAttributes(),
+		otelpgx.WithDisableConnectionDetailsInAttributes(),
+	)
 	return &QueryTracer{Tracer: base, duration: duration}, nil
 }
 
@@ -57,11 +65,17 @@ func (t *QueryTracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pg
 		if errors.As(data.Err, &pgErr) {
 			errorType = pgErr.Code
 		}
+
 		span := trace.SpanFromContext(ctx)
 		span.SetAttributes(attribute.String("error.type", errorType))
 		span.SetStatus(codes.Error, errorType)
 	}
-	t.duration.Record(ctx, time.Since(info.start).Seconds(), metric.WithAttributes(attribute.String("db.operation.name", info.operation), attribute.String("db.collection.name", info.collection), attribute.String("error.type", errorType)))
+
+	t.duration.Record(ctx, time.Since(info.start).Seconds(), metric.WithAttributes(
+		attribute.String("db.operation.name", info.operation),
+		attribute.String("db.collection.name", info.collection),
+		attribute.String("error.type", errorType),
+	))
 	t.Tracer.TraceQueryEnd(ctx, conn, data)
 }
 
@@ -71,6 +85,7 @@ func SQLAttributes(sql string) (string, string) {
 	if len(fields) == 0 {
 		return "UNKNOWN", ""
 	}
+
 	op := strings.ToUpper(fields[0])
 	collection := ""
 	for _, name := range []string{"trips", "trip_status_history", "idempotency_keys"} {
@@ -80,14 +95,17 @@ func SQLAttributes(sql string) (string, string) {
 				break
 			}
 		}
+
 		if collection != "" {
 			break
 		}
 	}
+
 	switch op {
 	case "SELECT", "INSERT", "UPDATE", "DELETE", "BEGIN", "COMMIT", "ROLLBACK":
 	default:
 		op = "OTHER"
 	}
+
 	return op, collection
 }

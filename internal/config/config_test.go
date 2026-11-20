@@ -5,51 +5,119 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/Makk228/avito-labs/internal/config"
 )
 
+func exampleEnvironment(t *testing.T) {
+	t.Helper()
+	data, err := os.ReadFile("../../.env.example")
+	require.NoError(t, err)
+
+	for line := range strings.SplitSeq(string(data), "\n") {
+		key, value, ok := strings.Cut(strings.TrimSpace(line), "=")
+		if ok {
+			t.Setenv(key, value)
+		}
+	}
+}
+
 func TestLoad(t *testing.T) {
+	exampleEnvironment(t)
+
+	cfg, err := config.Load()
+
+	require.NoError(t, err)
+	assert.Equal(t, ":8080", cfg.HTTP.Addr)
+	assert.EqualValues(t, 10, cfg.DB.MaxConns)
+	assert.EqualValues(t, 2, cfg.DB.MinConns)
+	assert.Equal(t, "local", cfg.Telemetry.Version)
+}
+
+func TestLoadRejectsInvalidConfiguration(t *testing.T) {
 	const invalidValue = "invalid"
+	const ratioSampler = "traceidratio"
+	const logLevelKey = "LOG_LEVEL"
 	const samplerKey = "OTEL_TRACES_SAMPLER"
+	const samplerArgKey = "OTEL_TRACES_SAMPLER_ARG"
 	for _, tc := range []struct {
 		name string
 		env  map[string]string
 		want string
 	}{
-		{"valid", nil, ""},
-		{"missing", map[string]string{"DATABASE_URL": ""}, "DATABASE_URL"},
-		{"pool", map[string]string{"DATABASE_MIN_CONNS": "20"}, "DATABASE_MIN_CONNS"},
-		{"timeout", map[string]string{"HTTP_READ_TIMEOUT": "0s"}, "HTTP_READ_TIMEOUT"},
-		{"level", map[string]string{"LOG_LEVEL": invalidValue}, "LOG_LEVEL"},
-		{"endpoint", map[string]string{"OTEL_EXPORTER_OTLP_ENDPOINT": "localhost:4318"}, "OTEL_EXPORTER_OTLP_ENDPOINT"},
-		{"protocol", map[string]string{"OTEL_EXPORTER_OTLP_PROTOCOL": invalidValue}, "OTEL_EXPORTER_OTLP_PROTOCOL"},
-		{"sampler", map[string]string{samplerKey: invalidValue}, samplerKey},
-		{"ratio", map[string]string{samplerKey: "traceidratio", "OTEL_TRACES_SAMPLER_ARG": "NaN"}, "OTEL_TRACES_SAMPLER_ARG"},
+		{
+			name: "missing database",
+			env:  map[string]string{"DATABASE_URL": ""},
+			want: "DATABASE_URL",
+		},
+		{
+			name: "minimum connections exceeds maximum",
+			env:  map[string]string{"DATABASE_MIN_CONNS": "20"},
+			want: "DATABASE_MIN_CONNS",
+		},
+		{
+			name: "zero timeout",
+			env:  map[string]string{"HTTP_READ_TIMEOUT": "0s"},
+			want: "HTTP_READ_TIMEOUT",
+		},
+		{
+			name: "invalid log level",
+			env:  map[string]string{logLevelKey: invalidValue},
+			want: "LogLevel",
+		},
+		{
+			name: "custom log level",
+			env:  map[string]string{logLevelKey: "INFO+1"},
+			want: logLevelKey,
+		},
+		{
+			name: "endpoint without scheme",
+			env:  map[string]string{"OTEL_EXPORTER_OTLP_ENDPOINT": "localhost:4318"},
+			want: "OTEL_EXPORTER_OTLP_ENDPOINT",
+		},
+		{
+			name: "unsupported protocol",
+			env:  map[string]string{"OTEL_EXPORTER_OTLP_PROTOCOL": invalidValue},
+			want: "OTEL_EXPORTER_OTLP_PROTOCOL",
+		},
+		{
+			name: "unsupported sampler",
+			env:  map[string]string{samplerKey: invalidValue},
+			want: samplerKey,
+		},
+		{
+			name: "nonfinite ratio",
+			env:  map[string]string{samplerKey: ratioSampler, samplerArgKey: "NaN"},
+			want: samplerArgKey,
+		},
+		{
+			name: "missing ratio",
+			env:  map[string]string{samplerKey: ratioSampler, samplerArgKey: ""},
+			want: samplerArgKey,
+		},
+		{
+			name: "missing parent based ratio",
+			env:  map[string]string{samplerKey: "parentbased_traceidratio", samplerArgKey: ""},
+			want: samplerArgKey,
+		},
+		{
+			name: "ratio above one",
+			env:  map[string]string{samplerKey: ratioSampler, samplerArgKey: "1.1"},
+			want: samplerArgKey,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			data, err := os.ReadFile("../../.env.example")
-			if err != nil {
-				t.Fatal(err)
-			}
-			for line := range strings.SplitSeq(string(data), "\n") {
-				key, value, ok := strings.Cut(strings.TrimSpace(line), "=")
-				if ok {
-					t.Setenv(key, value)
-				}
-			}
+			exampleEnvironment(t)
 			for key, value := range tc.env {
 				t.Setenv(key, value)
 			}
+
 			cfg, err := config.Load()
-			if tc.want != "" {
-				if err == nil || !strings.Contains(err.Error(), tc.want) {
-					t.Fatalf("want %s, got %v", tc.want, err)
-				}
-				return
-			}
-			if err != nil || cfg.HTTP.Addr == "" || cfg.DB.URL == "" || cfg.Telemetry.Version == "" {
-				t.Fatalf("invalid config: %+v %v", cfg, err)
-			}
+
+			require.ErrorContains(t, err, tc.want)
+			assert.Empty(t, cfg)
 		})
 	}
 }

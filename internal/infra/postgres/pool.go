@@ -14,6 +14,7 @@ func PoolConfig(cfg config.DB, tracer pgx.QueryTracer) (*pgxpool.Config, error) 
 	if err != nil {
 		return nil, fmt.Errorf("parse DATABASE_URL: %w", err)
 	}
+
 	poolCfg.MaxConns = cfg.MaxConns
 	poolCfg.MinConns = cfg.MinConns
 	poolCfg.MaxConnLifetime = cfg.MaxConnLifetime

@@ -43,13 +43,12 @@ func (m *Mockusecase) EXPECT() *MockusecaseMockRecorder {
 }
 
 // Create mocks base method.
-func (m *Mockusecase) Create(arg0 context.Context, arg1 model.NewTrip, arg2 *uuid.UUID) (model.Trip, bool, error) {
+func (m *Mockusecase) Create(arg0 context.Context, arg1 model.NewTrip, arg2 *uuid.UUID) (model.CreateTripResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Create", arg0, arg1, arg2)
-	ret0, _ := ret[0].(model.Trip)
-	ret1, _ := ret[1].(bool)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret0, _ := ret[0].(model.CreateTripResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Create indicates an expected call of Create.

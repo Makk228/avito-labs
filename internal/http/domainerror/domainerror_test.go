@@ -3,8 +3,11 @@ package domainerror_test
 import (
 	"errors"
 	"fmt"
-	"strings"
+	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/Makk228/avito-labs/internal/domain/trip"
 	"github.com/Makk228/avito-labs/internal/http/domainerror"
@@ -12,26 +15,65 @@ import (
 
 func TestProblem(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		err    error
-		status int
-		code   string
+		name       string
+		err        error
+		wantStatus int
+		wantCode   string
+		wantDetail string
 	}{
-		{"missing", trip.ErrTripNotFound, 404, "trip_not_found"},
-		{"completed", trip.ErrTripCompleted, 409, "trip_completed"},
-		{"busy", trip.ErrDriverBusy, 409, "driver_busy"},
-		{"idempotency", trip.ErrIdempotencyConflict, 409, "idempotency_conflict"},
-		{"validation", &trip.ValidationError{Field: "price", Message: "must be nonnegative"}, 400, "invalid_request"},
-		{"internal", errors.New("secret password=postgres SQL SELECT"), 500, "internal_error"},
+		{
+			name:       "missing",
+			err:        trip.ErrTripNotFound,
+			wantStatus: http.StatusNotFound,
+			wantCode:   "trip_not_found",
+			wantDetail: "Trip was not found",
+		},
+		{
+			name:       "completed",
+			err:        trip.ErrTripCompleted,
+			wantStatus: http.StatusConflict,
+			wantCode:   "trip_completed",
+			wantDetail: "Operation is not allowed for a completed trip",
+		},
+		{
+			name:       "busy",
+			err:        trip.ErrDriverBusy,
+			wantStatus: http.StatusConflict,
+			wantCode:   "driver_busy",
+			wantDetail: "Driver already has an active trip",
+		},
+		{
+			name:       "idempotency",
+			err:        trip.ErrIdempotencyConflict,
+			wantStatus: http.StatusConflict,
+			wantCode:   "idempotency_conflict",
+			wantDetail: "Idempotency-Key was already used with a different request body",
+		},
+		{
+			name:       "validation",
+			err:        &trip.ValidationError{Field: "price", Message: "must be nonnegative"},
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "invalid_request",
+			wantDetail: "price must be nonnegative",
+		},
+		{
+			name:       "internal details are hidden",
+			err:        errors.New("secret password=postgres SQL SELECT"),
+			wantStatus: http.StatusInternalServerError,
+			wantCode:   "internal_error",
+			wantDetail: "Internal server error",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			status, body := domainerror.Problem(fmt.Errorf("usecase: %w", tc.err))
-			if status != tc.status || int(body.Status) != status || body.Code != tc.code || body.Detail == nil || body.Title == "" || body.Type == "" {
-				t.Fatalf("bad problem: %d %+v", status, body)
-			}
-			if status == 500 && (strings.Contains(*body.Detail, "secret") || *body.Detail != "Internal server error") {
-				t.Fatalf("internal error leaked: %+v", body)
-			}
+
+			assert.Equal(t, tc.wantStatus, status)
+			assert.EqualValues(t, status, body.Status)
+			assert.Equal(t, tc.wantCode, body.Code)
+			require.NotNil(t, body.Detail)
+			assert.Equal(t, tc.wantDetail, *body.Detail)
+			assert.NotEmpty(t, body.Title)
+			assert.NotEmpty(t, body.Type)
 		})
 	}
 }

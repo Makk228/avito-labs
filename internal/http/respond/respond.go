@@ -32,10 +32,20 @@ func Invalid(w http.ResponseWriter, r *http.Request, detail string) {
 	Error(w, r, &trip.ValidationError{Message: detail})
 }
 
+const maxHTTPStatus = 599
+
 func Routing(w http.ResponseWriter, r *http.Request, status int, slug, title, code, detail string) {
-	if status < 100 || status > 599 {
+	if status < http.StatusContinue || status > maxHTTPStatus {
 		status = http.StatusInternalServerError
 	}
+
 	instance := r.URL.Path
-	Body(w, status, "application/problem+json", api.Problem{Type: "https://tripgo.example/problems/" + slug, Title: title, Status: int32(status), Code: code, Detail: &detail, Instance: &instance})
+	Body(w, status, "application/problem+json", api.Problem{
+		Type:     "https://tripgo.example/problems/" + slug,
+		Title:    title,
+		Status:   int32(status),
+		Code:     code,
+		Detail:   &detail,
+		Instance: &instance,
+	})
 }

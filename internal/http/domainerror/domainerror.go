@@ -9,20 +9,85 @@ import (
 	api "github.com/Makk228/avito-labs/internal/generated"
 )
 
+const problemTypeBase = "https://tripgo.example/problems/"
+
+type definition struct {
+	cause  error
+	status int32
+	slug   string
+	title  string
+	code   string
+	detail string
+}
+
+var domainProblems = []definition{
+	{
+		cause:  trip.ErrTripNotFound,
+		status: http.StatusNotFound,
+		slug:   "trip-not-found",
+		title:  "Trip not found",
+		code:   "trip_not_found",
+		detail: "Trip was not found",
+	},
+	{
+		cause:  trip.ErrTripCompleted,
+		status: http.StatusConflict,
+		slug:   "trip-completed",
+		title:  "Trip completed",
+		code:   "trip_completed",
+		detail: "Operation is not allowed for a completed trip",
+	},
+	{
+		cause:  trip.ErrDriverBusy,
+		status: http.StatusConflict,
+		slug:   "driver-busy",
+		title:  "Driver busy",
+		code:   "driver_busy",
+		detail: "Driver already has an active trip",
+	},
+	{
+		cause:  trip.ErrIdempotencyConflict,
+		status: http.StatusConflict,
+		slug:   "idempotency-conflict",
+		title:  "Idempotency conflict",
+		code:   "idempotency_conflict",
+		detail: "Idempotency-Key was already used with a different request body",
+	},
+}
+
 func Problem(err error) (int, api.Problem) {
-	status, slug, title, code, detail := http.StatusInternalServerError, "internal-error", "Internal Server Error", "internal_error", "Internal server error"
 	var validation *trip.ValidationError
-	switch {
-	case errors.As(err, &validation):
-		status, slug, title, code, detail = http.StatusBadRequest, "invalid-request", "Invalid request", "invalid_request", validation.Error()
-	case errors.Is(err, trip.ErrTripNotFound):
-		status, slug, title, code, detail = http.StatusNotFound, "trip-not-found", "Trip not found", "trip_not_found", "Trip was not found"
-	case errors.Is(err, trip.ErrTripCompleted):
-		status, slug, title, code, detail = http.StatusConflict, "trip-completed", "Trip completed", "trip_completed", "Operation is not allowed for a completed trip"
-	case errors.Is(err, trip.ErrDriverBusy):
-		status, slug, title, code, detail = http.StatusConflict, "driver-busy", "Driver busy", "driver_busy", "Driver already has an active trip"
-	case errors.Is(err, trip.ErrIdempotencyConflict):
-		status, slug, title, code, detail = http.StatusConflict, "idempotency-conflict", "Idempotency conflict", "idempotency_conflict", "Idempotency-Key was already used with a different request body"
+	if errors.As(err, &validation) {
+		return (definition{
+			status: http.StatusBadRequest,
+			slug:   "invalid-request",
+			title:  "Invalid request",
+			code:   "invalid_request",
+			detail: validation.Error(),
+		}).problem()
 	}
-	return status, api.Problem{Type: "https://tripgo.example/problems/" + slug, Title: title, Status: int32(status), Detail: &detail, Code: code}
+
+	for _, candidate := range domainProblems {
+		if errors.Is(err, candidate.cause) {
+			return candidate.problem()
+		}
+	}
+
+	return (definition{
+		status: http.StatusInternalServerError,
+		slug:   "internal-error",
+		title:  "Internal Server Error",
+		code:   "internal_error",
+		detail: "Internal server error",
+	}).problem()
+}
+
+func (d definition) problem() (int, api.Problem) {
+	return int(d.status), api.Problem{
+		Type:   problemTypeBase + d.slug,
+		Title:  d.title,
+		Status: d.status,
+		Code:   d.code,
+		Detail: &d.detail,
+	}
 }

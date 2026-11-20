@@ -17,6 +17,7 @@ func Conn(ctx context.Context, pool querier) querier {
 	if tx, ok := ctx.Value(txKey{}).(pgx.Tx); ok {
 		return tx
 	}
+
 	return pool
 }
 
@@ -57,6 +58,7 @@ func (m *TxManager) Do(ctx context.Context, fn func(ctx context.Context) error) 
 		if rbErr := m.rollback(ctx, tx); rbErr != nil {
 			return errors.Join(err, rbErr)
 		}
+
 		return err
 	}
 
@@ -65,6 +67,7 @@ func (m *TxManager) Do(ctx context.Context, fn func(ctx context.Context) error) 
 	if err := tx.Commit(commitCtx); err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
 	}
+
 	return nil
 }
 
@@ -74,5 +77,6 @@ func (m *TxManager) rollback(ctx context.Context, tx pgx.Tx) error {
 	if err := tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 		return fmt.Errorf("rollback transaction: %w", err)
 	}
+
 	return nil
 }

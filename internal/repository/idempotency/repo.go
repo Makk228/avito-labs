@@ -47,9 +47,11 @@ func (r *IdempotencyRepository) Reserve(ctx context.Context, key uuid.UUID, requ
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
+
 	if err != nil {
 		return false, fmt.Errorf("reserve idempotency key: %w", err)
 	}
+
 	return true, nil
 }
 
@@ -72,9 +74,11 @@ func (r *IdempotencyRepository) Get(ctx context.Context, key uuid.UUID) (trip.Id
 	if err := transaction.Conn(ctx, r.pool).QueryRow(ctx, query, args...).Scan(&rec.RequestHash, &tripID); err != nil {
 		return trip.IdempotencyRecord{}, fmt.Errorf("select idempotency key: %w", err)
 	}
+
 	if tripID == nil {
 		return trip.IdempotencyRecord{}, errors.New("idempotency key is not bound to a trip")
 	}
+
 	rec.TripID = *tripID
 	return rec, nil
 }
@@ -95,9 +99,11 @@ func (r *IdempotencyRepository) Bind(ctx context.Context, key, tripID uuid.UUID)
 	if err != nil {
 		return fmt.Errorf("bind idempotency key: %w", err)
 	}
+
 	if tag.RowsAffected() != 1 {
 		return fmt.Errorf("bind idempotency key: %d rows affected", tag.RowsAffected())
 	}
+
 	return nil
 }
 
@@ -116,6 +122,7 @@ func (r *IdempotencyRepository) DeleteExpired(ctx context.Context, now time.Time
 	if err != nil {
 		return 0, fmt.Errorf("delete expired idempotency keys: %w", err)
 	}
+
 	return tag.RowsAffected(), nil
 }
 

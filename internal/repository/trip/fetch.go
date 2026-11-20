@@ -29,9 +29,11 @@ func (r *TripRepository) Get(ctx context.Context, id uuid.UUID) (trip.Trip, erro
 	if errors.Is(err, pgx.ErrNoRows) {
 		return trip.Trip{}, trip.ErrTripNotFound
 	}
+
 	if err != nil {
 		return trip.Trip{}, fmt.Errorf("select trip: %w", err)
 	}
+
 	return t, nil
 }
 
@@ -42,5 +44,6 @@ func (r *TripRepository) CountActive(ctx context.Context) (int64, error) {
 	if err := transaction.Conn(ctx, r.pool).QueryRow(ctx, "SELECT count(*) FROM trips WHERE status = $1", trip.StatusActive).Scan(&count); err != nil {
 		return 0, fmt.Errorf("count active trips: %w", err)
 	}
+
 	return count, nil
 }

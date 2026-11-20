@@ -227,3 +227,120 @@ func (mr *MockmetricsMockRecorder) Created(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Created", reflect.TypeOf((*Mockmetrics)(nil).Created), arg0)
 }
+
+// Mocklogger is a mock of logger interface.
+type Mocklogger struct {
+	ctrl     *gomock.Controller
+	recorder *MockloggerMockRecorder
+	isgomock struct{}
+}
+
+// MockloggerMockRecorder is the mock recorder for Mocklogger.
+type MockloggerMockRecorder struct {
+	mock *Mocklogger
+}
+
+// NewMocklogger creates a new mock instance.
+func NewMocklogger(ctrl *gomock.Controller) *Mocklogger {
+	mock := &Mocklogger{ctrl: ctrl}
+	mock.recorder = &MockloggerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *Mocklogger) EXPECT() *MockloggerMockRecorder {
+	return m.recorder
+}
+
+// InfoContext mocks base method.
+func (m *Mocklogger) InfoContext(arg0 context.Context, arg1 string, arg2 ...any) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	m.ctrl.Call(m, "InfoContext", varargs...)
+}
+
+// InfoContext indicates an expected call of InfoContext.
+func (mr *MockloggerMockRecorder) InfoContext(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InfoContext", reflect.TypeOf((*Mocklogger)(nil).InfoContext), varargs...)
+}
+
+// Mockclock is a mock of clock interface.
+type Mockclock struct {
+	ctrl     *gomock.Controller
+	recorder *MockclockMockRecorder
+	isgomock struct{}
+}
+
+// MockclockMockRecorder is the mock recorder for Mockclock.
+type MockclockMockRecorder struct {
+	mock *Mockclock
+}
+
+// NewMockclock creates a new mock instance.
+func NewMockclock(ctrl *gomock.Controller) *Mockclock {
+	mock := &Mockclock{ctrl: ctrl}
+	mock.recorder = &MockclockMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *Mockclock) EXPECT() *MockclockMockRecorder {
+	return m.recorder
+}
+
+// Now mocks base method.
+func (m *Mockclock) Now() time.Time {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Now")
+	ret0, _ := ret[0].(time.Time)
+	return ret0
+}
+
+// Now indicates an expected call of Now.
+func (mr *MockclockMockRecorder) Now() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Now", reflect.TypeOf((*Mockclock)(nil).Now))
+}
+
+// MockidGenerator is a mock of idGenerator interface.
+type MockidGenerator struct {
+	ctrl     *gomock.Controller
+	recorder *MockidGeneratorMockRecorder
+	isgomock struct{}
+}
+
+// MockidGeneratorMockRecorder is the mock recorder for MockidGenerator.
+type MockidGeneratorMockRecorder struct {
+	mock *MockidGenerator
+}
+
+// NewMockidGenerator creates a new mock instance.
+func NewMockidGenerator(ctrl *gomock.Controller) *MockidGenerator {
+	mock := &MockidGenerator{ctrl: ctrl}
+	mock.recorder = &MockidGeneratorMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockidGenerator) EXPECT() *MockidGeneratorMockRecorder {
+	return m.recorder
+}
+
+// NewID mocks base method.
+func (m *MockidGenerator) NewID() uuid.UUID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewID")
+	ret0, _ := ret[0].(uuid.UUID)
+	return ret0
+}
+
+// NewID indicates an expected call of NewID.
+func (mr *MockidGeneratorMockRecorder) NewID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewID", reflect.TypeOf((*MockidGenerator)(nil).NewID))
+}

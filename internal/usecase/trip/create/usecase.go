@@ -4,106 +4,144 @@ package create
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/Makk228/avito-labs/internal/domain/trip"
+	"github.com/Makk228/avito-labs/internal/model"
 )
+
+type Dependencies struct {
+	Transactions txManager
+	Trips        tripRepository
+	Idempotency  idempotencyStore
+	Clock        clock
+	IDs          idGenerator
+	Logger       logger
+	Metrics      metrics
+}
+
+type Config struct {
+	KeyTTL time.Duration
+}
 
 type Usecase struct {
 	tx      txManager
 	trips   tripRepository
 	keys    idempotencyStore
-	keyTTL  time.Duration
-	now     func() time.Time
-	log     *slog.Logger
+	clock   clock
+	ids     idGenerator
+	log     logger
 	metrics metrics
+	keyTTL  time.Duration
 }
 
-func New(tx txManager, trips tripRepository, keys idempotencyStore, keyTTL time.Duration, log *slog.Logger, counters metrics) *Usecase {
-	return &Usecase{tx: tx, trips: trips, keys: keys, keyTTL: keyTTL, now: now, log: log, metrics: counters}
-}
-
-func now() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
-func (s *Usecase) Create(ctx context.Context, in trip.NewTrip, key *uuid.UUID) (t trip.Trip, replayed bool, err error) {
-	if err := in.Validate(); err != nil {
-		return trip.Trip{}, false, fmt.Errorf("create trip: %w", err)
+func New(deps Dependencies, cfg Config) *Usecase {
+	return &Usecase{
+		tx:      deps.Transactions,
+		trips:   deps.Trips,
+		keys:    deps.Idempotency,
+		clock:   deps.Clock,
+		ids:     deps.IDs,
+		log:     deps.Logger,
+		metrics: deps.Metrics,
+		keyTTL:  cfg.KeyTTL,
 	}
-	err = s.tx.Do(ctx, func(ctx context.Context) error {
+}
+
+func (u *Usecase) Create(ctx context.Context, in model.NewTrip, key *uuid.UUID) (model.CreateTripResult, error) {
+	if err := in.Validate(); err != nil {
+		return model.CreateTripResult{}, fmt.Errorf("validate new trip: %w", err)
+	}
+
+	var result model.CreateTripResult
+	err := u.tx.Do(ctx, func(txCtx context.Context) error {
 		if key != nil {
-			prev, found, err := s.lookupKey(ctx, *key, in)
+			existing, err := u.lookupKey(txCtx, *key, in)
 			if err != nil {
-				return fmt.Errorf("create trip operation: %w", err)
+				return err
 			}
-			if found {
-				t, replayed = prev, true
+
+			if existing != nil {
+				result.Trip = *existing
 				return nil
 			}
 		}
 
-		startedAt := s.now()
-		t = trip.Trip{
-			ID:        uuid.New(),
+		value := model.Trip{
+			ID:        u.ids.NewID(),
 			UserID:    in.UserID,
 			DriverID:  in.DriverID,
 			Start:     in.Start,
 			End:       in.End,
 			Price:     in.Price,
 			Status:    trip.StatusActive,
-			StartedAt: startedAt,
+			StartedAt: u.clock.Now(),
 		}
-		if err := s.trips.Create(ctx, t); err != nil {
-			return fmt.Errorf("create trip operation: %w", err)
+
+		if err := u.trips.Create(txCtx, value); err != nil {
+			return fmt.Errorf("save trip: %w", err)
 		}
-		if err := s.trips.AddStatusChange(ctx, trip.StatusChange{
-			TripID:    t.ID,
+
+		history := model.StatusChange{
+			TripID:    value.ID,
 			To:        trip.StatusActive,
 			Reason:    "trip created",
-			ChangedAt: startedAt,
-		}); err != nil {
-			return fmt.Errorf("create trip operation: %w", err)
+			ChangedAt: value.StartedAt,
 		}
+
+		if err := u.trips.AddStatusChange(txCtx, history); err != nil {
+			return fmt.Errorf("save initial status: %w", err)
+		}
+
 		if key != nil {
-			if err := s.keys.Bind(ctx, *key, t.ID); err != nil {
-				return fmt.Errorf("create trip operation: %w", err)
+			if err := u.keys.Bind(txCtx, *key, value.ID); err != nil {
+				return fmt.Errorf("bind idempotency key: %w", err)
 			}
 		}
+
+		result = model.CreateTripResult{Trip: value, Created: true}
 		return nil
 	})
 	if err != nil {
-		return trip.Trip{}, false, fmt.Errorf("create trip: %w", err)
+		return model.CreateTripResult{}, fmt.Errorf("create trip transaction: %w", err)
 	}
-	if !replayed {
-		s.metrics.Created(ctx)
-		s.log.InfoContext(ctx, "trip created", slog.String("trip_id", t.ID.String()))
+
+	if result.Created {
+		u.metrics.Created(ctx)
+		u.log.InfoContext(ctx, "trip created", "trip_id", result.Trip.ID.String())
 	}
-	return t, replayed, nil
+
+	return result, nil
 }
 
-func (s *Usecase) lookupKey(ctx context.Context, key uuid.UUID, in trip.NewTrip) (trip.Trip, bool, error) {
+func (u *Usecase) lookupKey(ctx context.Context, key uuid.UUID, in model.NewTrip) (*model.Trip, error) {
 	hash := in.Fingerprint()
-	createdAt := s.now()
+	createdAt := u.clock.Now()
 
-	reserved, err := s.keys.Reserve(ctx, key, hash, createdAt, createdAt.Add(s.keyTTL))
+	reserved, err := u.keys.Reserve(ctx, key, hash, createdAt, createdAt.Add(u.keyTTL))
 	if err != nil {
-		return trip.Trip{}, false, fmt.Errorf("create trip: %w", err)
+		return nil, fmt.Errorf("reserve idempotency key: %w", err)
 	}
+
 	if reserved {
-		return trip.Trip{}, false, nil
+		return nil, nil
 	}
 
-	rec, err := s.keys.Get(ctx, key)
+	record, err := u.keys.Get(ctx, key)
 	if err != nil {
-		return trip.Trip{}, false, fmt.Errorf("create trip: %w", err)
+		return nil, fmt.Errorf("fetch idempotency key: %w", err)
 	}
-	if rec.RequestHash != hash {
-		return trip.Trip{}, false, trip.ErrIdempotencyConflict
+
+	if record.RequestHash != hash {
+		return nil, trip.ErrIdempotencyConflict
 	}
-	t, err := s.trips.Get(ctx, rec.TripID)
+
+	value, err := u.trips.Get(ctx, record.TripID)
 	if err != nil {
-		return trip.Trip{}, false, fmt.Errorf("get trip by idempotency key: %w", err)
+		return nil, fmt.Errorf("fetch saved idempotent trip: %w", err)
 	}
-	return t, true, nil
+
+	return &value, nil
 }

@@ -21,6 +21,7 @@ import (
 	gethandler "github.com/Makk228/avito-labs/internal/http/trip/get"
 	"github.com/Makk228/avito-labs/internal/infra/postgres"
 	"github.com/Makk228/avito-labs/internal/infra/postgres/transaction"
+	"github.com/Makk228/avito-labs/internal/infra/system"
 	"github.com/Makk228/avito-labs/internal/infra/telemetry"
 	"github.com/Makk228/avito-labs/internal/repository/idempotency"
 	triprepo "github.com/Makk228/avito-labs/internal/repository/trip"
@@ -45,12 +46,14 @@ func New(ctx context.Context, cfg config.Config) (*Container, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	c := &Container{cfg: cfg, log: log, telemetry: providers}
 	if err := c.build(ctx); err != nil {
 		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cfg.ShutdownTimeout)
 		defer cancel()
 		return nil, errors.Join(err, c.Close(closeCtx))
 	}
+
 	return c, nil
 }
 
@@ -60,19 +63,23 @@ func (c *Container) build(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	poolCfg, err := postgres.PoolConfig(c.cfg.DB, tracer)
 	if err != nil {
 		return err
 	}
+
 	c.pool, err = pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return fmt.Errorf("create database pool: %w", err)
 	}
+
 	pingCtx, cancel := context.WithTimeout(ctx, c.cfg.DB.ConnectTimeout)
 	defer cancel()
 	if err := c.pool.Ping(pingCtx); err != nil {
 		return fmt.Errorf("ping database: %w", err)
 	}
+
 	tx := transaction.NewTxManager(c.pool, c.cfg.DB.QueryTimeout)
 	trips := triprepo.NewTripRepository(c.pool, c.cfg.DB.QueryTimeout)
 	keys := idempotency.NewIdempotencyRepository(c.pool, c.cfg.DB.QueryTimeout)
@@ -80,13 +87,30 @@ func (c *Container) build(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	createUC := create.New(tx, trips, keys, c.cfg.Idempotency.KeyTTL, c.log, counters)
+
+	runtime := system.Runtime{}
+	createUC := create.New(create.Dependencies{
+		Transactions: tx,
+		Trips:        trips,
+		Idempotency:  keys,
+		Clock:        runtime,
+		IDs:          runtime,
+		Logger:       c.log,
+		Metrics:      counters,
+	}, create.Config{KeyTTL: c.cfg.Idempotency.KeyTTL})
 	getUC := get.New(trips)
-	finishUC := finish.New(tx, trips, c.log, counters)
+	finishUC := finish.New(finish.Dependencies{
+		Transactions: tx,
+		Trips:        trips,
+		Clock:        runtime,
+		Logger:       c.log,
+		Metrics:      counters,
+	})
 	mw, err := middleware.New(c.log, c.telemetry.Traces, meter)
 	if err != nil {
 		return err
 	}
+
 	handler := transport.NewHandler(createhandler.New(createUC), gethandler.New(getUC), finishhandler.New(finishUC), c.pool, c.cfg.DB.QueryTimeout)
 	c.server = transport.NewServer(c.cfg.HTTP, transport.NewRouter(handler, mw), c.log)
 	c.cleanup = keycleanup.New(keys, c.cfg.Idempotency.CleanupInterval, c.log)
@@ -106,6 +130,7 @@ func (c *Container) Run(ctx context.Context) error {
 		defer cancel()
 		return errors.Join(fmt.Errorf("listen: %w", err), c.Close(closeCtx))
 	}
+
 	bgCtx, stop := context.WithCancel(context.WithoutCancel(ctx))
 	var background sync.WaitGroup
 	background.Go(func() { c.cleanup.Run(bgCtx) })
@@ -120,11 +145,13 @@ func (c *Container) Run(ctx context.Context) error {
 			runErr = fmt.Errorf("http server: %w", err)
 		}
 	}
+
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), c.cfg.ShutdownTimeout)
 	defer cancel()
 	if err := c.server.Shutdown(shutdownCtx); err != nil {
 		runErr = errors.Join(runErr, err, c.server.Close())
 	}
+
 	stop()
 	done := make(chan struct{})
 	go func() { background.Wait(); close(done) }()
@@ -133,6 +160,7 @@ func (c *Container) Run(ctx context.Context) error {
 	case <-shutdownCtx.Done():
 		runErr = errors.Join(runErr, shutdownCtx.Err())
 	}
+
 	return errors.Join(runErr, c.Close(shutdownCtx))
 }
 
@@ -143,6 +171,7 @@ func (c *Container) Close(ctx context.Context) error {
 	if c.telemetry != nil {
 		closeErr = c.telemetry.Shutdown(ctx)
 	}
+
 	if c.pool != nil {
 		done := make(chan struct{})
 		go func() { c.pool.Close(); close(done) }()
@@ -153,12 +182,15 @@ func (c *Container) Close(ctx context.Context) error {
 			return errors.Join(closeErr, fmt.Errorf("close database pool: %w", ctx.Err()))
 		}
 	}
+
 	if closeErr != nil {
 		if ctx.Err() != nil {
 			c.log.ErrorContext(ctx, "shutdown timeout exceeded, exiting forcibly", slog.Any("error", closeErr))
 		}
+
 		return fmt.Errorf("shutdown telemetry: %w", closeErr)
 	}
+
 	c.log.InfoContext(ctx, "service stopped")
 	return nil
 }

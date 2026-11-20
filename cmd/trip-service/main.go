@@ -22,19 +22,23 @@ func run(args []string) error {
 	if len(args) != 0 && (len(args) != 2 || args[0] != "migrate") {
 		return fmt.Errorf("unknown arguments %q, usage: trip-service [migrate up|down|reset|status]", args)
 	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	app, err := container.New(ctx, cfg)
 	if err != nil {
 		return err
 	}
+
 	if len(args) == 0 {
 		return app.Run(ctx)
 	}
+
 	defer func() {
 		closeCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 		defer cancel()
